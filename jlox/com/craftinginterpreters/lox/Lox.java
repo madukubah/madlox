@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-public class Lox{
+public class Lox {
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
             System.out.println("Usage: jlox [script]");
@@ -18,30 +18,31 @@ public class Lox{
         } else if (args.length == 1) {
             runFile(args[0]);
         } else {
-            runPromt();
+            runPrompt();
         }
-
-    }   
+    }
 
     private static void runFile(String path) throws IOException {
         byte[] bytes = Files.readAllBytes(Paths.get(path));
-        String x = new String(bytes, Charset.defaultCharset());
-        run(x);
+        String source = new String(bytes, Charset.defaultCharset());
+        run(source);
     }
 
-    private static void runPromt() throws IOException {
+    private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
 
-        for(;;){
+        for (;;) {
             System.out.print("> ");
             String line = reader.readLine();
-            if(line == null) break;
+            if (line == null)
+                break;
             run(line);
         }
     }
 
-    private static void run(String source){
+    private static void run(String source) {
+        // Use a custom lexer to tokenize the input
         Scanner scanner = new Scanner(source);
         List<String> tokens = new ArrayList<>();
 
@@ -49,9 +50,9 @@ public class Lox{
             String token = scanner.next();
             tokens.add(token);
         }
-        for(String token : tokens){
+
+        for (String token : tokens) {
             System.out.println(token);
         }
     }
-
 }
