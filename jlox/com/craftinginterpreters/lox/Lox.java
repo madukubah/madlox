@@ -8,9 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
+
 
 public class Lox{
+
+    static boolean hadError;
     public static void main(String[] args) throws IOException {
         if (args.length > 1) {
             System.out.println("Usage: jlox [script]");
@@ -26,6 +28,7 @@ public class Lox{
         byte[] bytes = Files.readAllBytes(Paths.get(path));
         String source = new String(bytes, Charset.defaultCharset());
         run(source);
+        if(hadError) System.exit(65);
     }
 
     private static void runPrompt() throws IOException {
@@ -38,21 +41,28 @@ public class Lox{
             if (line == null)
                 break;
             run(line);
+            hadError = true;
         }
     }
 
     private static void run(String source) {
         // Use a custom lexer to tokenize the input
         Scanner scanner = new Scanner(source);
-        List<String> tokens = new ArrayList<>();
+        List<Token> tokens = scanner.scanTokens();
 
-        while (scanner.hasNext()) {
-            String token = scanner.next();
-            tokens.add(token);
-        }
-
-        for (String token : tokens) {
+        for (Token token : tokens) {
             System.out.println(token);
         }
+    }
+
+    static void error(int line, String message){
+        report(line, "", message);
+    }
+
+    private static void report(int line, String where, String message){
+        System.err.println(
+            "[line "+line+"] Error " + where + ": " + message
+        );
+        hadError = true;
     }
 }
