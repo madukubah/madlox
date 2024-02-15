@@ -1,5 +1,8 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.craftinginterpreters.lox.Expr.Binary;
 import com.craftinginterpreters.lox.Expr.Grouping;
 import com.craftinginterpreters.lox.Expr.Literal;
@@ -56,6 +59,15 @@ public class AstPrinter implements Expr.Visitor<String> {
                 new Token(TokenType.MINUS, "-", null, 1),
                 new Literal(45.67))
             ));
-        System.out.println(new AstPrinter().print(expression));
+
+        List<Token> tokens = new ArrayList<>();
+        tokens.add(new Token(TokenType.NUMBER, "123", 123, 1));
+        tokens.add(new Token(TokenType.BANG_EQUAL, "!=", null, 1));
+        tokens.add(new Token(TokenType.NUMBER, "123", 123, 1));
+        tokens.add(new Token(TokenType.EOF, "", null, 1));
+
+        Parser parser = new Parser(tokens);
+        Expr expession_2 = parser.parse();
+        System.out.println(new AstPrinter().print(expession_2));
     }
 }

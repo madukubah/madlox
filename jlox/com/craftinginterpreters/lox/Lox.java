@@ -1,5 +1,7 @@
 package com.craftinginterpreters.lox;
 
+import static com.craftinginterpreters.lox.TokenType.EOF;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -41,7 +43,7 @@ public class Lox{
             if (line == null)
                 break;
             run(line);
-            hadError = true;
+            hadError = false;
         }
     }
 
@@ -49,10 +51,12 @@ public class Lox{
         // Use a custom lexer to tokenize the input
         Scanner scanner = new Scanner(source);
         List<Token> tokens = scanner.scanTokens();
+        Parser parser = new Parser(tokens);
+        Expr expession = parser.parse();
 
-        for (Token token : tokens) {
-            System.out.println(token);
-        }
+        if(hadError) return;
+
+        System.out.println(new AstPrinter().print(expession));
     }
 
     static void error(int line, String message){
@@ -64,5 +68,13 @@ public class Lox{
             "[line "+line+"] Error " + where + ": " + message
         );
         hadError = true;
+    }
+
+    static void error(Token token, String message){
+        if (token.type == EOF) {
+            report(token.line, " at end", message);
+        }else{
+            report(token.line, " at '" + token.lexeme + "'", message);
+        }
     }
 }
