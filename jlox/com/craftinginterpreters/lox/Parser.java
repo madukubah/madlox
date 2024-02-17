@@ -2,6 +2,7 @@ package com.craftinginterpreters.lox;
 
 import java.util.List;
 import static com.craftinginterpreters.lox.TokenType.*;
+// expressions    expression ( (",") expression)* ;
 // expression     equality ;
 // equality       comparison ( ( "!=" | "==" ) comparison )* ;
 // comparison     term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
@@ -24,10 +25,22 @@ public class Parser {
 
     Expr parse(){
         try {
-            return expression();
+            return expressions();
         } catch (ParseError e) {
             return null;
         }
+    }
+
+    private Expr expressions(){
+        Expr expr = expression();
+
+        while (match(COMMA)){
+            Token operator = previous();
+            Expr right = expression();
+            expr = new Expr.Binary(expr, operator, right);
+        }
+
+        return expr;
     }
 
     private Expr expression(){
