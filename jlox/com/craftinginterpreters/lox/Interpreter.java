@@ -53,9 +53,23 @@ public class Interpreter implements Expr.Visitor<Object> {
                 if (left instanceof String && right instanceof String) {
                     return (String)left + (String)right;
                 }
-                throw new RuntimeError(expr.operator, "Operand must be two numbers or two strings.");
+                if (left instanceof String && right instanceof Double) {
+                    right = String.valueOf((double)right);
+                    if(((String) right).endsWith(".0")) right = ((String) right).substring(0, ((String) right).length()-2);
+                    return (String)left + (String)right;
+                }
+                if (left instanceof Double && right instanceof String) {
+                    left = String.valueOf((double)left);
+                    if(((String) left).endsWith(".0")) left = ((String) left).substring(0, ((String) left).length()-2);
+                    return (String)left + (String)right;
+                }
+                
+                throw new RuntimeError(expr.operator, "Operand must be two numbers or two strings or mix of it.");
             case SLASH:
                 checkNumberOperands(expr.operator, left, right);
+                if(((double)right) == 0)
+                    throw new RuntimeError(expr.operator, "Division by zero.");
+                    
                 return (double)left / (double)right;
             case STAR:
                 checkNumberOperands(expr.operator, left, right);
