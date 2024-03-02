@@ -1,0 +1,4 @@
+var test = 1;
+var test1 = 5;
+print test = test1 = 3;
+print test1;

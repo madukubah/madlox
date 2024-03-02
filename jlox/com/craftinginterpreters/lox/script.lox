@@ -1,14 +1,19 @@
-// this is a comment
-(( )){} // grouping stuff
-!*+-/=<> <= == // operators
-"string"
-"123.4"
-123.4
-var2_z
-var z = 2
-printfoo
-/* */
-print "foo"
-/* 
-    teest
-*/
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
+print a;
+print b;
+print c;

@@ -1,0 +1,14 @@
+// this is a comment
+(( )){} // grouping stuff
+!*+-/=<> <= == // operators
+"string"
+"123.4"
+123.4
+var2_z
+var z = 2
+printfoo
+/* */
+print "foo"
+/* 
+    teest
+*/

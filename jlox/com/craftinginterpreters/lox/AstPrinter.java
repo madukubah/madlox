@@ -3,10 +3,12 @@ package com.craftinginterpreters.lox;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.craftinginterpreters.lox.Expr.Assign;
 import com.craftinginterpreters.lox.Expr.Binary;
 import com.craftinginterpreters.lox.Expr.Grouping;
 import com.craftinginterpreters.lox.Expr.Literal;
 import com.craftinginterpreters.lox.Expr.Unary;
+import com.craftinginterpreters.lox.Expr.Variable;
 
 public class AstPrinter implements Expr.Visitor<String> {
 
@@ -67,7 +69,19 @@ public class AstPrinter implements Expr.Visitor<String> {
         tokens.add(new Token(TokenType.EOF, "", null, 1));
 
         Parser parser = new Parser(tokens);
-        Expr expession_2 = parser.parse();
-        System.out.println(new AstPrinter().print(expession_2));
+        // Expr expession_2 = parser.parse();
+        System.out.println(new AstPrinter().print(expression));
+    }
+
+    @Override
+    public String visitVariableExpr(Variable expr) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'visitVariableExpr'");
+    }
+
+    @Override
+    public String visitAssignExpr(Assign expr) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'visitAssignExpr'");
     }
 }
