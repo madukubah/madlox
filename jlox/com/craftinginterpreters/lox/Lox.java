@@ -14,6 +14,7 @@ import java.util.List;
 
 public class Lox{
     private static final Interpreter interpreter = new Interpreter();
+    static boolean replMode = false;
     static boolean hadError = false;
     static boolean hadRuntimeError = false;
     public static void main(String[] args) throws IOException {
@@ -23,6 +24,7 @@ public class Lox{
         } else if (args.length == 1) {
             runFile(args[0]);
         } else {
+            replMode = true;
             runPrompt();
         }
     }
@@ -44,6 +46,7 @@ public class Lox{
             String line = reader.readLine();
             if (line == null)
                 break;
+            line += ";";
             run(line);
             hadError = false;
         }
@@ -57,9 +60,16 @@ public class Lox{
         // Expr expession = parser.parse();
         List<Stmt> statements = parser.parse();
 
+        if (replMode) {
+            for(int i=0; i< statements.size(); i++){
+                if (statements.get(i) instanceof Stmt.Expression) {
+                    statements.set(i, new Stmt.Print(((Stmt.Expression) statements.get(i)).expression));
+                }
+            }
+        }
+
         if(hadError) return;
 
-        // System.out.println(new AstPrinter().print(expession));
         interpreter.interpret(statements);
     }
 
