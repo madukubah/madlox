@@ -28,7 +28,10 @@ public class GenerateAst {
             "Print : Expr expression",
             "If : Expr Condition, Stmt thenBranch, Stmt elseBranch",
             "Var : Token name, Expr initializer",
-            "While : Expr Condition, Stmt body"
+            "While : Expr condition, Stmt body",
+            "For : Stmt initializer, Expr condition, Expr increment, Stmt body",
+            "Break",
+            "Continue"
         ));
     }
 
@@ -45,8 +48,13 @@ public class GenerateAst {
         defineVisitor(writer, baseName, types);
 
         for (String type : types) {
-            String className = type.split(":")[0].trim();
-            String fields = type.split(":")[1].trim();
+            String className = type.trim();
+            String fields = "";
+            if(type.contains(":")){
+                className = type.split(":")[0].trim();
+                fields = type.split(":")[1].trim();
+            }
+            
             defineType(writer, baseName, className, fields);
         }
         
@@ -67,7 +75,10 @@ public class GenerateAst {
     }
 
     private static void defineType(PrintWriter writer, String baseName, String className, String fieldList){
-        String[] fields = fieldList.split(", ");
+        String[] fields = new String[]{};
+        if(fieldList.length() > 0){
+            fields = fieldList.split(", ");
+        }
 
         writer.println("    static class "+ className + " extends " + baseName + " {");
         writer.println("        " + className + "(" + fieldList + "){");

@@ -42,11 +42,17 @@ public class Lox{
         BufferedReader reader = new BufferedReader(input);
 
         for (;;) {
-            System.out.print("> ");
-            String line = reader.readLine();
+            String line = "";
+            String endChar = " ";
+            while( !endChar.equals(";")){
+                System.out.print("> ");
+                line += reader.readLine();
+
+                if (line != null) endChar = line.substring(line.length()-1);
+            }
+            
             if (line == null)
                 break;
-            line += ";";
             run(line);
             hadError = false;
         }

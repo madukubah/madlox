@@ -12,7 +12,10 @@ import com.craftinginterpreters.lox.Expr.Logical;
 import com.craftinginterpreters.lox.Expr.Unary;
 import com.craftinginterpreters.lox.Expr.Variable;
 import com.craftinginterpreters.lox.Stmt.Block;
+import com.craftinginterpreters.lox.Stmt.Break;
+import com.craftinginterpreters.lox.Stmt.Continue;
 import com.craftinginterpreters.lox.Stmt.Expression;
+import com.craftinginterpreters.lox.Stmt.For;
 import com.craftinginterpreters.lox.Stmt.If;
 import com.craftinginterpreters.lox.Stmt.Print;
 import com.craftinginterpreters.lox.Stmt.Var;
@@ -21,6 +24,8 @@ import com.craftinginterpreters.lox.Stmt.While;
 
 public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
     private Environment environment = new Environment();
+    private static class BreakException extends RuntimeException{}
+    private static class ContinueException extends RuntimeException{}
 
     // void interpret(Expr expr){
     //     try {
@@ -193,10 +198,44 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Void visitWhileStmt(While stmt) {
-        while (isTruthy(evaluate(stmt.Condition))) {
-            execute(stmt.body);
+        while (isTruthy(evaluate(stmt.condition))) {
+            try {
+                execute(stmt.body);
+            } catch (BreakException e) {
+                break;
+            } catch (ContinueException e) {
+                continue;
+            }
         }
         return null;
+    }
+
+    @Override
+    public Void visitForStmt(For stmt) {
+        execute(stmt.initializer);
+        while (isTruthy(evaluate(stmt.condition))) {
+            try {
+                execute(stmt.body);
+            } catch (BreakException e) {
+                break;
+            } catch (ContinueException e) {
+                continue;
+            } finally {
+                evaluate(stmt.increment);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitBreakStmt(Break stmt) {
+        throw new BreakException();
+    }
+
+    @Override
+    public Void visitContinueStmt(Continue stmt) {
+        throw new ContinueException();
+
     }
 
     private Object evaluate(Expr expr){
