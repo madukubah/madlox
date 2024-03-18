@@ -1,0 +1,1 @@
+var x = fun(a){print a;} ;
