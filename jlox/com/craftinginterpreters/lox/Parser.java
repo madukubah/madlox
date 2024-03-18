@@ -8,8 +8,14 @@ import static com.craftinginterpreters.lox.TokenType.*;
 
 // program        : declaration* EOF ;
 
-// declaration    : varDecl
+// declaration    : funDecl
+//                | varDecl
 //                | statement ;
+
+// funDecl        : "fun" function ;
+
+// function       : IDENTIFIER "(" parameters? ")" block ;
+// parameters     : IDENTIFIER ( "," IDENTIFIER )* ;
 
 // varDecl        : "var" IDENTIFIER ( "=" expression )? ";" ;
 
@@ -20,8 +26,10 @@ import static com.craftinginterpreters.lox.TokenType.*;
 //                | printStmt
 //                | block 
 //                | breakStmt
+//                | returnStmt
 //                | continueStmt ;
 
+// returnStmt     : "return" expression? ";" ;
 
 // ifStmt         : "if" "(" expression ")" statement ("else" statement)? ;
 
@@ -56,7 +64,11 @@ import static com.craftinginterpreters.lox.TokenType.*;
 // factor         : unary ( ( "/" | "*" ) unary )* ;
 
 // unary          : ( "!" | "-" ) unary
-//                | primary ;
+//                | call ;
+
+// call           : primary ("(" arguments? ")")* ;
+
+// arguments      : expression ("," expression)* ;
 
 // primary        : NUMBER | STRING | "true" | "false" | "nil"
 //                | "(" expression ")" ;
@@ -82,14 +94,33 @@ public class Parser {
 
     private Stmt declaration(){
         try {
-            if (match(VAR)) {
-                return varDeclaration();
-            }
+            if (match(FUN)) return function("function");
+            if (match(VAR)) return varDeclaration();
             return statement();
         } catch (ParseError error) {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt.Function function(String kind){
+        Token name = consume(IDENTIFIER, "Expect " + kind + " name.");
+        consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList<>();
+        while (!check(RIGHT_PAREN)) {
+            do {
+                if (parameters.size() > 255) {
+                    error(peek(), "Can`t have more then 255 parameters.");
+                }
+                parameters.add(consume(IDENTIFIER, "Expect parameter name."));
+            } while (match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after parameters.");
+        
+        consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+        List<Stmt> body = block();
+
+        return new Stmt.Function(name, parameters, body);
     }
 
     private Stmt varDeclaration(){
@@ -107,6 +138,7 @@ public class Parser {
     private Stmt statement(){
         if (match(PRINT)) return printStatement();
         if (match(IF)) return ifStatement();
+        if (match(RETURN)) return returnStatement();
 
         if (match(FOR)) {
             loopStack.add(true);
@@ -131,6 +163,17 @@ public class Parser {
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
 
         return expressionStatement();
+    }
+
+    private Stmt returnStatement(){
+        Token keyword = previous();
+        Expr value = null;
+        if (!check(SEMICOLON)) {
+            value = expression();
+        }
+
+        consume(SEMICOLON,"Expect ';' after 'return' value.");
+        return new Stmt.Return(keyword, value);
     }
 
     private List<Stmt> block(){
@@ -169,7 +212,7 @@ public class Parser {
     }
 
     private Stmt forStatement(){
-        consume(LEFT_PARENT, "Expect '(' after while.");
+        consume(LEFT_PAREN, "Expect '(' after while.");
         Stmt initializer;
         if (match(SEMICOLON)) {
             initializer = new Stmt.Expression(new Expr.Literal(NIL));
@@ -186,10 +229,10 @@ public class Parser {
         consume(SEMICOLON, "Expect ';' at after loop condition.");
 
         Expr increment = new Expr.Literal(NIL);
-        if (!check(RIGHT_PARENT)){
+        if (!check(RIGHT_PAREN)){
             increment = expression();
         }
-        consume(RIGHT_PARENT, "Expect ')' after clauses.");
+        consume(RIGHT_PAREN, "Expect ')' after clauses.");
 
         Stmt body = statement();
 
@@ -197,18 +240,18 @@ public class Parser {
     }
 
     private Stmt whileStatement(){
-        consume(LEFT_PARENT, "Expect '(' after while.");
+        consume(LEFT_PAREN, "Expect '(' after while.");
         Expr condition = expression();
-        consume(RIGHT_PARENT, "Expect ')' after while condition.");
+        consume(RIGHT_PAREN, "Expect ')' after while condition.");
         Stmt body = statement();
 
         return new Stmt.While(condition, body);
     }
 
     private Stmt ifStatement(){
-        consume(LEFT_PARENT, "Expect '(' after if.");
+        consume(LEFT_PAREN, "Expect '(' after if.");
         Expr condition = expression();
-        consume(RIGHT_PARENT, "Expect ')' after if condition.");
+        consume(RIGHT_PAREN, "Expect ')' after if condition.");
 
         Stmt thenBranch = statement();
         Stmt elseBranch = null;
@@ -339,7 +382,37 @@ public class Parser {
             Expr right = unary();
             return new Expr.Unary(operator, right);
         }
-        return primary();
+        return call();
+    }
+
+    private Expr call(){
+        Expr expr = primary();
+
+        while (true) {
+            if (match(LEFT_PAREN)) {
+                expr = finishCall(expr);
+            }else{
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    private Expr finishCall(Expr expr){
+        List<Expr> arguments = new ArrayList<>();
+
+        while (!check(RIGHT_PAREN)) {
+            do {
+                if (arguments.size() > 255) {
+                    error(peek(), "Can`t have more then 255 arguments.");
+                }
+                arguments.add(expression());
+            } while (match(COMMA));
+        }
+
+        Token paren = consume(TokenType.RIGHT_PAREN, "Expect ')' after arguments.");
+        return new Expr.Call(expr, paren, arguments);
     }
 
     private Expr primary(){
@@ -354,9 +427,9 @@ public class Parser {
             return new Expr.Variable(previous());
         }
 
-        if (match(LEFT_PARENT)) {
+        if (match(LEFT_PAREN)) {
             Expr expr = expression();
-            consume(TokenType.RIGHT_PARENT, "Expect ')' after expression.");
+            consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
         }
         throw error(peek(), "Expect expression.");
