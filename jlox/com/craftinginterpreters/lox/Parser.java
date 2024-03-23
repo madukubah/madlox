@@ -1,6 +1,7 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Stack;
 
@@ -75,8 +76,6 @@ import static com.craftinginterpreters.lox.TokenType.*;
 
 public class Parser {
     private static class ParseError extends RuntimeException{}
-    private Stack<Boolean> loopStack = new Stack<>();
-
     public final List<Token> tokens;
     public int current = 0;
 
@@ -140,23 +139,8 @@ public class Parser {
         if (match(IF)) return ifStatement();
         if (match(RETURN)) return returnStatement();
 
-        if (match(FOR)) {
-            loopStack.add(true);
-            try {
-                return forStatement();
-            } finally {
-                loopStack.pop();
-            }
-        }
-
-        if (match(WHILE)) {
-            loopStack.add(true);
-            try {
-                return whileStatement();
-            } finally {
-                loopStack.pop();
-            }
-        }
+        if (match(FOR)) return forStatement();
+        if (match(WHILE)) return whileStatement();
 
         if (match(BREAK)) return breakStatement();
         if (match(CONTINUE)) return continueStatement();
@@ -188,21 +172,13 @@ public class Parser {
     }
 
     private Stmt breakStatement(){
-        if (insideLoop()) {
-            consume(SEMICOLON,"Expect ';' after 'break' statement.");
-            return new Stmt.Break();   
-        }
-
-        throw error(peek(), "'break' statement must be inside loop");
+        consume(SEMICOLON,"Expect ';' after 'break' statement.");
+        return new Stmt.Break(previous());   
     }
 
     private Stmt continueStatement(){
-        if (insideLoop()) {
-            consume(SEMICOLON,"Expect ';' after 'continue' statement.");
-            return new Stmt.Continue();   
-        }
-
-        throw error(peek(), "'continue' statement must be inside loop");
+        consume(SEMICOLON,"Expect ';' after 'continue' statement.");
+        return new Stmt.Continue(previous());   
     }
 
     private Stmt printStatement(){
@@ -235,7 +211,7 @@ public class Parser {
         consume(RIGHT_PAREN, "Expect ')' after clauses.");
 
         Stmt body = statement();
-
+        
         return new Stmt.For(initializer, condition, increment, body);
     }
 
@@ -472,10 +448,6 @@ public class Parser {
 
     private Token previous(){
         return tokens.get(current-1);
-    }
-
-    private boolean insideLoop(){
-        return !loopStack.empty() && loopStack.peek();
     }
 
     private ParseError error(Token token, String message){

@@ -3,7 +3,9 @@ package com.craftinginterpreters.lox;
 import static com.craftinginterpreters.lox.TokenType.OR;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.craftinginterpreters.lox.Expr.Assign;
 import com.craftinginterpreters.lox.Expr.Binary;
@@ -24,12 +26,12 @@ import com.craftinginterpreters.lox.Stmt.Print;
 import com.craftinginterpreters.lox.Stmt.Return;
 import com.craftinginterpreters.lox.Stmt.Var;
 import com.craftinginterpreters.lox.Stmt.While;
-import com.craftinginterpreters.lox.LoxReturn;
 
 
 public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
     final Environment globals = new Environment();
     private Environment environment = globals;
+    private final Map<Expr, Integer> locals = new HashMap<>();
     private static class BreakException extends RuntimeException{}
     private static class ContinueException extends RuntimeException{}
 
@@ -159,9 +161,20 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     @Override
     public Object visitVariableExpr(Variable expr) {
-        Object value = environment.get(expr.name);
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr){
+        Object value = null;
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            value = environment.getAt(distance, name.lexeme);
+        }else{
+            value = globals.get(name);
+        }
+
         if (value == null) {
-            throw new RuntimeError(expr.name, "Variable not been initialized.");
+            throw new RuntimeError(name, "Variable not been initialized.");
         }
         return value;
     }
@@ -169,7 +182,12 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
     @Override
     public Object visitAssignExpr(Assign expr) {
         Object value = evaluate(expr.value);
-        environment.assign(expr.name, value);
+        Integer distance = locals.get(expr);
+        if (distance != null) {
+            environment.assignAt(distance, expr.name, value); 
+        }else{
+            globals.assign(expr.name, value);
+        }
         return value;
     }
 
@@ -292,6 +310,10 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
 
     private void execute(Stmt stmt){
         stmt.accept(this);
+    }
+
+    public void resolve(Expr expr, Integer depth){
+        locals.put(expr, depth);
     }
 
     public void executeBlock(List<Stmt> statements, Environment environment){
