@@ -1,1 +1,3 @@
-return "test";
+fun test(a, b){
+  return a;
+}

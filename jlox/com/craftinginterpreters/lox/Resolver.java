@@ -28,6 +28,7 @@ import com.craftinginterpreters.lox.Stmt.While;
 public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private final Interpreter interpreter;
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
+    private final Map<String, Token> locals = new HashMap<>();
     private FunctionType currentFunction = FunctionType.NONE;
     private LoopType currentLoop = LoopType.NONE;
 
@@ -104,6 +105,9 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
             resolve(stmt.initializer);
         }
         define(stmt.name);
+
+        if(!scopes.isEmpty()) locals.put(stmt.name.lexeme, stmt.name);
+
         return null;
     }
 
@@ -205,6 +209,10 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
     
     private void endScope(){
+        for (Map.Entry<String, Token> set : locals.entrySet()) {
+            Lox.error(set.getValue(), "The declared variable is never used.");
+        }
+        locals.clear();
         scopes.pop();
     }
 
@@ -228,6 +236,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         for (int i = scopes.size()-1; i >= 0; i--) {
             if (scopes.get(i).containsKey(name.lexeme)) {
                 interpreter.resolve(expr, scopes.size() - 1 - i);
+                locals.remove(name.lexeme);
                 return;
             }
             
@@ -242,6 +251,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         for (Token param : function.params) {
             declare(param);
             define(param);
+            if(!scopes.isEmpty()) locals.put(param.lexeme, param);
         }
         resolve(function.body);
         endScope();
