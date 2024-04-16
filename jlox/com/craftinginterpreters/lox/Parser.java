@@ -1,17 +1,18 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Stack;
 
 import static com.craftinginterpreters.lox.TokenType.*;
 
 // program        : declaration* EOF ;
 
-// declaration    : funDecl
+// declaration    : classDecl
+//                | funDecl
 //                | varDecl
 //                | statement ;
+
+// classDecl      : "class" IDENTIFIER "{" function* "}" ;
 
 // funDecl        : "fun" function ;
 
@@ -49,7 +50,7 @@ import static com.craftinginterpreters.lox.TokenType.*;
 
 // expression     : assigment;
 
-// assigment      : IDENTIFIER "=" assignment
+// assigment      : (call ".")? IDENTIFIER "=" assignment
 //                | logic_or;
 
 // logic_or       : logic_and ("or" logic_and)* ;
@@ -67,12 +68,12 @@ import static com.craftinginterpreters.lox.TokenType.*;
 // unary          : ( "!" | "-" ) unary
 //                | call ;
 
-// call           : primary ("(" arguments? ")")* ;
+// call           : primary ( ("(" arguments? ")") | ("." IDENTIFIER) )*  ;
 
 // arguments      : expression ("," expression)* ;
 
 // primary        : NUMBER | STRING | "true" | "false" | "nil"
-//                | "(" expression ")" ;
+//                | "(" expression ")" | IDENTIFIER;
 
 public class Parser {
     private static class ParseError extends RuntimeException{}
@@ -95,11 +96,26 @@ public class Parser {
         try {
             if (match(FUN)) return function("function");
             if (match(VAR)) return varDeclaration();
+            if (match(CLASS)) return classDeclaration();
             return statement();
         } catch (ParseError error) {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt.Class classDeclaration(){
+        Token name = consume(IDENTIFIER, "Expect class name.");
+        consume(LEFT_BRACE, "Expect '{' before class body.");
+        
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function("methods"));
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after class body.");
+        
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt.Function function(String kind){
@@ -271,6 +287,9 @@ public class Parser {
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable) expr).name;
                 return new Expr.Assign(name, value);
+            }else if( expr instanceof Expr.Get ){
+                Expr.Get get = ((Expr.Get)expr);
+                return new Expr.Set(get.object, get.name, value);
             }
 
             error(equals, "Invalid assigment target.");
@@ -367,6 +386,9 @@ public class Parser {
         while (true) {
             if (match(LEFT_PAREN)) {
                 expr = finishCall(expr);
+            } else if(match(DOT)){
+                Token name = consume(IDENTIFIER,"Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
             }else{
                 break;
             }
@@ -408,6 +430,11 @@ public class Parser {
             consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
         }
+
+        if (match(THIS)) {
+            return new Expr.This(previous());
+        }
+
         throw error(peek(), "Expect expression.");
     }
 

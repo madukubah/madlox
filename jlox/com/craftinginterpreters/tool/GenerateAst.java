@@ -13,28 +13,32 @@ public class GenerateAst {
         }
         String outputDir = args[0];
         defineAst(outputDir, "Expr", Arrays.asList(
-            "Assign : Token name, Expr value",
-            "Logical : Expr left, Token operator, Expr right",
-            "Binary : Expr left, Token operator, Expr right",
-            "Call : Expr callee, Token paren, List<Expr> arguments",
-            "Grouping : Expr expression",
-            "Literal : Object value",
-            "Unary : Token operator, Expr right",
-            "Variable : Token name"
+        "Assign     : Token name, Expr value",
+            "Logical     : Expr left, Token operator, Expr right",
+            "Set         : Expr object, Token name, Expr value",
+            "This        : Token keyword",
+            "Binary      : Expr left, Token operator, Expr right",
+            "Call        : Expr callee, Token paren, List<Expr> arguments",
+            "Get         : Expr object, Token name",
+            "Grouping    : Expr expression",
+            "Literal     : Object value",
+            "Unary       : Token operator, Expr right",
+            "Variable    : Token name"
             ));
         
         defineAst(outputDir, "Stmt", Arrays.asList(
-            "Block : List<Stmt> statements",
+            "Class : Token name, List<Stmt.Function> methods",
+            "Block      : List<Stmt> statements",
             "Expression : Expr expression",
-            "Function : Token name, List<Token> params, List<Stmt> body",
-            "Return : Token keyword, Expr value",
-            "Print : Expr expression",
-            "If : Expr Condition, Stmt thenBranch, Stmt elseBranch",
-            "Var : Token name, Expr initializer",
-            "While : Expr condition, Stmt body",
-            "For : Stmt initializer, Expr condition, Expr increment, Stmt body",
-            "Break : Token keyword",
-            "Continue : Token keyword"
+            "Function   : Token name, List<Token> params, List<Stmt> body",
+            "Return     : Token keyword, Expr value",
+            "Print      : Expr expression",
+            "If         : Expr Condition, Stmt thenBranch, Stmt elseBranch",
+            "Var        : Token name, Expr initializer",
+            "While      : Expr condition, Stmt body",
+            "For        : Stmt initializer, Expr condition, Expr increment, Stmt body",
+            "Break      : Token keyword",
+            "Continue   : Token keyword"
         ));
     }
 

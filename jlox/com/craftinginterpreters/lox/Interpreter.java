@@ -10,13 +10,17 @@ import java.util.Map;
 import com.craftinginterpreters.lox.Expr.Assign;
 import com.craftinginterpreters.lox.Expr.Binary;
 import com.craftinginterpreters.lox.Expr.Call;
+import com.craftinginterpreters.lox.Expr.Get;
 import com.craftinginterpreters.lox.Expr.Grouping;
 import com.craftinginterpreters.lox.Expr.Literal;
 import com.craftinginterpreters.lox.Expr.Logical;
+import com.craftinginterpreters.lox.Expr.Set;
+import com.craftinginterpreters.lox.Expr.This;
 import com.craftinginterpreters.lox.Expr.Unary;
 import com.craftinginterpreters.lox.Expr.Variable;
 import com.craftinginterpreters.lox.Stmt.Block;
 import com.craftinginterpreters.lox.Stmt.Break;
+import com.craftinginterpreters.lox.Stmt.Class;
 import com.craftinginterpreters.lox.Stmt.Continue;
 import com.craftinginterpreters.lox.Stmt.Expression;
 import com.craftinginterpreters.lox.Stmt.For;
@@ -62,6 +66,115 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
         } catch (RuntimeError error) {
             Lox.runtimeError(error);
         }
+    }
+
+    @Override
+    public Void visitClassStmt(Class stmt) {
+        environment.define(stmt.name.lexeme, null);
+
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for (Stmt.Function method : stmt.methods) {
+            LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
+            methods.put(method.name.lexeme, function);
+        }
+
+        LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+        environment.assign(stmt.name, klass);
+        return null;
+    }
+
+    @Override
+    public Void visitFunctionStmt(Function stmt) {
+        environment.define(stmt.name.lexeme, new LoxFunction(stmt, environment, false));
+        return null;
+    }
+
+    @Override
+    public Void visitReturnStmt(Return stmt) {
+        Object value = null;
+        if(stmt.value != null) value = evaluate(stmt.value);
+
+        throw new LoxReturn(value);
+    }
+
+    @Override
+    public Void visitBlockStmt(Block stmt) {
+        executeBlock(stmt.statements, new Environment(environment));
+        return null;
+    }
+
+    @Override
+    public Void visitExpressionStmt(Expression stmt) {
+        evaluate(stmt.expression);
+        return null;
+    }
+
+    @Override
+    public Void visitIfStmt(If stmt) {
+        if (isTruthy(evaluate(stmt.Condition))) {
+            execute(stmt.thenBranch);
+        } else if (stmt.elseBranch != null) {
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitPrintStmt(Print stmt) {
+        Object value = evaluate(stmt.expression);
+        System.out.println(stringify(value));
+        return null;
+    }
+
+    @Override
+    public Void visitVarStmt(Var stmt) {
+        Object value = null;
+        if (stmt.initializer != null) {
+            value = evaluate(stmt.initializer);
+        }
+        environment.define(stmt.name.lexeme, value);
+        return null;
+    }
+
+    @Override
+    public Void visitWhileStmt(While stmt) {
+        while (isTruthy(evaluate(stmt.condition))) {
+            try {
+                execute(stmt.body);
+            } catch (BreakException e) {
+                break;
+            } catch (ContinueException e) {
+                continue;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitForStmt(For stmt) {
+        execute(stmt.initializer);
+        while (isTruthy(evaluate(stmt.condition))) {
+            try {
+                execute(stmt.body);
+            } catch (BreakException e) {
+                break;
+            } catch (ContinueException e) {
+                continue;
+            } finally {
+                evaluate(stmt.increment);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Void visitBreakStmt(Break stmt) {
+        throw new BreakException();
+    }
+
+    @Override
+    public Void visitContinueStmt(Continue stmt) {
+        throw new ContinueException();
     }
 
     @Override
@@ -192,6 +305,24 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
     }
 
     @Override
+    public Object visitSetExpr(Set expr) {
+        Object instance = evaluate(expr.object);
+        if (!(instance instanceof LoxInstance)) {
+            throw new RuntimeError(expr.name, "Only instances have fields.");
+        }
+
+        Object value = evaluate(expr.value);
+        ((LoxInstance) instance).set(expr.name, value);
+
+        return value;
+    }
+
+    @Override
+    public Object visitThisExpr(This expr) {
+        return lookUpVariable(expr.keyword, expr);
+    }
+
+    @Override
     public Object visitCallExpr(Call expr) {
         Object callee = evaluate(expr.callee);
 
@@ -211,97 +342,12 @@ public class Interpreter implements Expr.Visitor<Object> , Stmt.Visitor<Void> {
     }
 
     @Override
-    public Void visitBlockStmt(Block stmt) {
-        executeBlock(stmt.statements, new Environment(environment));
-        return null;
-    }
-
-    @Override
-    public Void visitExpressionStmt(Expression stmt) {
-        evaluate(stmt.expression);
-        return null;
-    }
-
-    @Override
-    public Void visitIfStmt(If stmt) {
-        if (isTruthy(evaluate(stmt.Condition))) {
-            execute(stmt.thenBranch);
-        } else if (stmt.elseBranch != null) {
-            execute(stmt.elseBranch);
+    public Object visitGetExpr(Get expr) {
+        Object instance = evaluate(expr.object);
+        if (instance instanceof LoxInstance) {
+            return ((LoxInstance) instance).get(expr.name);
         }
-        return null;
-    }
-
-    @Override
-    public Void visitPrintStmt(Print stmt) {
-        Object value = evaluate(stmt.expression);
-        System.out.println(stringify(value));
-        return null;
-    }
-
-    @Override
-    public Void visitVarStmt(Var stmt) {
-        Object value = null;
-        if (stmt.initializer != null) {
-            value = evaluate(stmt.initializer);
-        }
-        environment.define(stmt.name.lexeme, value);
-        return null;
-    }
-
-    @Override
-    public Void visitWhileStmt(While stmt) {
-        while (isTruthy(evaluate(stmt.condition))) {
-            try {
-                execute(stmt.body);
-            } catch (BreakException e) {
-                break;
-            } catch (ContinueException e) {
-                continue;
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public Void visitForStmt(For stmt) {
-        execute(stmt.initializer);
-        while (isTruthy(evaluate(stmt.condition))) {
-            try {
-                execute(stmt.body);
-            } catch (BreakException e) {
-                break;
-            } catch (ContinueException e) {
-                continue;
-            } finally {
-                evaluate(stmt.increment);
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public Void visitBreakStmt(Break stmt) {
-        throw new BreakException();
-    }
-
-    @Override
-    public Void visitContinueStmt(Continue stmt) {
-        throw new ContinueException();
-    }
-
-    @Override
-    public Void visitFunctionStmt(Function stmt) {
-        environment.define(stmt.name.lexeme, new LoxFunction(stmt, environment));
-        return null;
-    }
-
-    @Override
-    public Void visitReturnStmt(Return stmt) {
-        Object value = null;
-        if(stmt.value != null) value = evaluate(stmt.value);
-
-        throw new LoxReturn(value);
+        throw new RuntimeError(expr.name, "Only instances have properties.");
     }
 
     private Object evaluate(Expr expr){
