@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -pedantic -ggdb
+CFLAGS=-Wall -Wextra -Werror -std=c11 -pedantic -ggdb
 
-SOURCES = main.c heap.c
+SOURCES = main.c heap.c heap.h
 OBJECTS = $(SOURCES:.c=.o)
 
 TARGET = heap

@@ -1,7 +1,15 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 #include "./heap.h"
 
 uintptr_t heap[HEAP_CAP_WORDS] = {0};
+const uintptr_t *stackBase = 0;
+
+bool reachableChunks[HEAP_CAP_WORDS] = {0};
+void *toFree[CHUNK_LIST_CAP];
+size_t toFreeCount = 0;
 
 ChunkList allocedChunks = {0};
 ChunkList freedChunks = {
@@ -68,8 +76,8 @@ void chunkListMerge(ChunkList *dst, const ChunkList *src){
     }
 }
 
-void chunkListDump(const ChunkList *list){
-    printf("Chunks (%zu): \n", list->count);
+void chunkListDump(const ChunkList *list, const char* name){
+    printf("%s Chunks (%zu): \n", name, list->count);
     for (size_t i = 0; i < list->count; i++)
     {
         printf("  start: %p, size: %zu \n", (void *)list->chunks[i].start, list->chunks[i].size);
@@ -78,7 +86,7 @@ void chunkListDump(const ChunkList *list){
 
 
 void *heapAlloc(size_t sizeBytes){
-    size_t sizeWords = (sizeBytes + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+    const size_t sizeWords = (sizeBytes + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
     if (sizeWords > 0)
     {
         chunkListMerge(&tmpChunks, &freedChunks);
@@ -115,6 +123,36 @@ void heapFree(uintptr_t *ptr){
     }
 }
 
+static void markRegion(const uintptr_t *start,const uintptr_t *end){
+    for(; start < end; start += 1){
+        const uintptr_t *p = (const uintptr_t *) *start;
+        for(size_t i = 0; i < allocedChunks.count; i++){
+            Chunk chunk = allocedChunks.chunks[i];
+            if(p >= chunk.start && p < chunk.start + chunk.size){
+                if(!reachableChunks[i]){
+                    reachableChunks[i] = true;
+                    markRegion(chunk.start, chunk.start + chunk.size);
+                }
+            }
+        }
+    }
+}
+
 void heapCollect(){
-    UNIMPLEMENTED;
+    const uintptr_t *stackStart = (const uintptr_t*)__builtin_frame_address(0);
+    memset(reachableChunks, 0, sizeof(reachableChunks));
+    markRegion(stackStart, stackBase + 1);
+    
+    toFreeCount = 0;
+    for(size_t i = 0; i < allocedChunks.count; i++){
+        if(!reachableChunks[i]){
+            assert(toFreeCount < CHUNK_LIST_CAP);
+            toFree[toFreeCount++] = allocedChunks.chunks[i].start;
+        }
+    }
+
+    for(size_t i = 0; i < toFreeCount; i++){
+        heapFree(toFree[i]);
+    }
+
 }

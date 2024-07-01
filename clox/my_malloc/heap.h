@@ -17,6 +17,7 @@ static_assert(HEAP_CAP_BYTES % sizeof(uintptr_t) == 0, "the heap capacity is not
 #define HEAP_CAP_WORDS (HEAP_CAP_BYTES / sizeof(uintptr_t))
 
 extern uintptr_t heap[HEAP_CAP_WORDS];
+extern const uintptr_t *stackBase;
 
 void *heapAlloc(size_t sizeBytes);
 void heapFree(uintptr_t *ptr);
@@ -43,6 +44,6 @@ int chunkListFind(const ChunkList *list, uintptr_t *ptr);
 void chunkListInsert(ChunkList *list, uintptr_t *ptr, size_t size);
 void chunkListRemove(ChunkList *list, size_t index);
 void chunkListMerge(ChunkList *dst, const ChunkList *src);
-void chunkListDump(const ChunkList *list);
+void chunkListDump(const ChunkList *list, const char* name);
 
 #endif // HEAP_H
