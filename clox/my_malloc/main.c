@@ -13,8 +13,8 @@ typedef struct Node Node;
 
 struct Node {
     char x;
-    void *left;
-    void *right;
+    Node *left;
+    Node *right;
 };
 
 Node *generateTree(size_t level_cur, size_t level_max){
@@ -35,27 +35,21 @@ Node *generateTree(size_t level_cur, size_t level_max){
 void printTree(Node *root, Jim *jim);
 
 void printTree(Node *root, Jim *jim){
-    (void) root;
-    (void) jim;
-    // if(root != NULL){
-    //     jim_object_begin(jim);
-    //     jim_member_key(jim, "value");
-    //     jim_string_sized(jim, &root->x, 1);
+    if(root != NULL){
+        jim_object_begin(jim);
+        jim_member_key(jim, "value");
+        jim_string_sized(jim, &root->x, 1);
 
-    //     jim_member_key(jim, "left");
-    //     printTree(root->left, jim);
+        jim_member_key(jim, "left");
+        printTree(root->left, jim);
 
-    //     jim_member_key(jim, "right");
-    //     printTree(root->right, jim);
+        jim_member_key(jim, "right");
+        printTree(root->right, jim);
 
-    //     jim_object_end(jim);
-    // }else{
-    //     jim_null(jim);
-    // }
-}
-
-void func(void *ptr){
-    (void) ptr;
+        jim_object_end(jim);
+    }else{
+        jim_null(jim);
+    }
 }
 
 #define N 10

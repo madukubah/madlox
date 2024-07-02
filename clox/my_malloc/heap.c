@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include "./heap.h"
@@ -152,7 +151,7 @@ void heapCollect(){
     }
 
     for(size_t i = 0; i < toFreeCount; i++){
-        heapFree(toFree[i]);
+        heapFree((uintptr_t *)toFree[i]);
     }
 
 }
