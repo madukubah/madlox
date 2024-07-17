@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "common.h": "c",
+        "chunk.h": "c",
+        "debug.h": "c"
     }
 }
