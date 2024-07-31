@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <string.h>
 
 #include "object.h"
@@ -19,18 +18,22 @@ static Obj* allocateObject(size_t size, ObjType type){
     return obj;
 }
 
-static ObjString* allocateString(char* chars, int length){
-    ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+static ObjString* allocateString(const char* chars, int length){
+    ObjString* string = (ObjString*) reallocate(NULL, 0, sizeof(ObjString) + (sizeof(char) * (length + 1)));
+
+    string->obj.type = OBJ_STRING;
+    string->obj.next = vm.objects;
+    vm.objects = (Obj*) string;
+
     string->length = length;
-    string->chars = chars;
+    memcpy(string->chars, chars, length);
+    string->chars[length] = '\0';
+
     return string;
 }
 
-ObjString* copyString(const char* chars, int length){
-    char* heapChars = ALLOCATE(char, length + 1);
-    heapChars[length] = '\0';
-    memcpy(heapChars, chars, length);
-    return allocateString(heapChars, length);
+ObjString* copyString(char* chars, int length){
+    return allocateString(chars, length);
 }
 
 ObjString* takeString(char* chars, int length){

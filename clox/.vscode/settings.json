@@ -27,6 +27,9 @@
         "__tuple": "c",
         "array": "c",
         "variant": "c",
-        "compare": "c"
+        "compare": "c",
+        "memory.h": "c",
+        "stdio.h": "c",
+        "string.h": "c"
     }
 }
