@@ -27,6 +27,8 @@
         "__tuple": "c",
         "array": "c",
         "variant": "c",
-        "compare": "c"
+        "compare": "c",
+        "typeinfo": "c",
+        "value.h": "c"
     }
 }
