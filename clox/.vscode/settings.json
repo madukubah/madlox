@@ -29,6 +29,7 @@
         "variant": "c",
         "compare": "c",
         "typeinfo": "c",
-        "value.h": "c"
+        "value.h": "c",
+        "unordered_map": "c"
     }
 }

@@ -1,0 +1,5 @@
+if((false or true) and true){
+    print "true";
+}else{
+    print "false";
+}
