@@ -1,1 +1,8 @@
-print clock(1, 2);
+fun outer() {
+  var x = 1;
+  fun inner() {
+    print x; // (1)
+  }
+  inner();
+}
+outer();
