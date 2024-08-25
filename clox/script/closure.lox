@@ -1,18 +1,23 @@
-var globalSet;
-var globalGet;
+var globalOne;
+var globalTwo;
 
 fun main() {
-  var a = "initial";
+  for (var a = 1; a <= 2; a = a + 1) {
+    {
+      var b = a;
+      fun closure() {
+        print b;
+      }
+      if (globalOne == nil) {
+        globalOne = closure;
+      } else {
+        globalTwo = closure;
+      }
+    }
 
-  fun set() { a = "updated"; }
-  fun get() { print a; }
-
-  globalSet = set;
-  globalGet = get;
+  }
 }
 
 main();
-globalSet();
-globalGet();
-main();
-globalGet();
+globalOne();
+globalTwo();
