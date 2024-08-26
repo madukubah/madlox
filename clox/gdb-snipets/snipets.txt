@@ -1,0 +1,25 @@
+display frame
+display frame->closure
+display frame->closure->function
+
+display vm.frames[vm.frameCount - 1]->closure
+display vm.frames[vm.frameCount - 1]->closure->function
+display *vm.frames[vm.frameCount - 1]->ip
+
+define print_linkl
+    set $node = $arg0
+    while ($node != 0)
+        printf "Node: %d, Address: %p, isMarked: %d, Next: %p\n", $node->type, $node, $node->isMarked, $node->next
+        set $node = $node->next
+    end
+end
+
+print_linkl vm.objects
+
+define print_gstack
+    set $i = 0
+    while ($i < vm.grayCount)
+        printf " %p ", vm.grayStack[$i]
+        set $i = $i + 1
+    end
+end

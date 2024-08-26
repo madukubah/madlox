@@ -10,7 +10,7 @@
 #include "debug.h"
 #endif
 
-#define GC_HEAP_GROW_FACTOR
+#define GC_HEAP_GROW_FACTOR 2
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize){
     vm.bytesAllocated += newSize - oldSize;
@@ -100,7 +100,7 @@ static void markRoots(){
     markTable(&vm.globals);
 
     for(int i = 0; i < vm.frameCount; i++){
-        markObject((Obj*) &vm.frames[i].closure);
+        markObject((Obj*) vm.frames[i].closure);
     }
 
     for(ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL; upvalue = upvalue->next){
@@ -197,7 +197,7 @@ void collectGarbage(){
     tableRemoveWhite(&vm.strings);
     sweep();
 
-    vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR
+    vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
