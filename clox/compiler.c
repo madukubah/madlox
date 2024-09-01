@@ -8,8 +8,10 @@
 #include "memory.h"
 
 // declaration     : varDecl
+//                 | classDecl
 //                 | statement
 
+// classDecl       : "class" IDENTIFIER block
 // varDecl         : "var" IDENTIFIER ("=" expr)? ";"
 
 // statement       : printStatement
@@ -71,14 +73,16 @@ typedef struct {
 } Upvalue;
 
 typedef enum {
+    TYPE_INITIALIZER,
+    TYPE_METHOD,
     TYPE_FUNCTION,
     TYPE_SCRIPT
-} FunctinType;
+} FunctionType;
 
 typedef struct Compiler{
     struct Compiler* enclosing;
     ObjFunction* function;
-    FunctinType type;
+    FunctionType type;
 
     Local locals[UINT8_COUNT];
     int localCount;
@@ -86,8 +90,14 @@ typedef struct Compiler{
     int scopeDepth;
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+    bool hasSuperClass;
+} ClassCompiler;
+
 Parser parser;
 Compiler* current = NULL;
+ClassCompiler* currentClass = NULL;
 
 static Chunk* currentChunk(){
     return &current->function->chunk;
@@ -158,7 +168,11 @@ static void emitBytes(uint8_t byte1, uint8_t byte2){
 }
 
 static void emitReturn(){
-    emitByte(OP_NIL);
+    if(current->type == TYPE_INITIALIZER){
+        emitBytes(OP_GET_LOCAL, 0);
+    }else{
+        emitByte(OP_NIL);
+    }
     emitByte(OP_RETURN);
 }
 
@@ -205,7 +219,7 @@ static void emitLoop(int loopStart){
     emitByte(offset & 0xff);
 }
 
-static void initCompiler(Compiler* compiler, FunctinType type){
+static void initCompiler(Compiler* compiler, FunctionType type){
     compiler->enclosing = current;
     compiler->function = NULL;
     compiler->type = type;
@@ -221,8 +235,13 @@ static void initCompiler(Compiler* compiler, FunctinType type){
     Local* local = &current->locals[current->localCount++];
     local->depth = 0;
     local->isCaptured = false;
-    local->name.start = "";
-    local->name.length = 0;
+    if(type != TYPE_FUNCTION){
+        local->name.start = "this";
+        local->name.length = 4;
+    }else{
+        local->name.start = "";
+        local->name.length = 0;
+    }
 }
 
 static ObjFunction* endCompiler(){
@@ -256,8 +275,6 @@ static void endScope(){
 }
 
 static void expression();
-static void statement();
-static void declaration();
 static uint8_t identifierConstant(Token* name);
 static bool identifiersEqual(Token* a, Token* b);
 static ParseRule* getRule(TokenType type);
@@ -296,6 +313,22 @@ static uint8_t argumentList(){
     }
     consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
     return argCount;
+}
+
+static void dot(bool canAssign){
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint8_t name = identifierConstant(&parser.previous);
+
+    if(canAssign && match(TOKEN_EQUAL)){
+        expression();
+        emitBytes(OP_SET_PROPERTY, name);
+    }else if(match(TOKEN_LEFT_PAREN)){
+        uint8_t argCount = argumentList();
+        emitBytes(OP_INVOKE, name);
+        emitByte(argCount);
+    }else{
+        emitBytes(OP_GET_PROPERTY, name);
+    }
 }
 
 static void call(bool canAssign){
@@ -414,6 +447,45 @@ static void variable(bool canAssign){
     namedVariable(parser.previous, canAssign);
 }
 
+static Token syntheticToken(const char* text){
+    Token token;
+    token.start = text;
+    token.length = strlen(text);
+    return token;
+}
+
+static void super_(bool canAssign){
+    if(currentClass == NULL){
+        error("Can`t use 'super' outside of a class.");
+    }else if(!currentClass->hasSuperClass){
+        error("Can`t use 'super' in a class with no superclass.");
+    }
+
+    consume(TOKEN_DOT, "Expect '.' after 'super'.");
+    consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+    uint8_t name = identifierConstant(&parser.previous);
+
+    namedVariable(syntheticToken("this"), false);
+
+    if(match(TOKEN_LEFT_PAREN)){
+        int argCount = argumentList();
+        namedVariable(syntheticToken("super"), false);
+        emitBytes(OP_SUPER_INVOKE, name);
+        emitByte(argCount);
+    }else{
+        namedVariable(syntheticToken("super"), false);
+        emitBytes(OP_GET_SUPER, name);
+    }
+}
+
+static void this_(bool canAssign){
+    if(currentClass == NULL){
+        error("Can`t use 'this' outside of a class.");
+        return;
+    }
+    variable(false);
+}
+
 static void unary(bool canAssign){
     TokenType operatorType = parser.previous.type;
 
@@ -443,7 +515,7 @@ ParseRule rules[] = {
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE}, 
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_DOT]           = {NULL,     dot,    PREC_CALL},
   [TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
   [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
   [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
@@ -471,8 +543,8 @@ ParseRule rules[] = {
   [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_SUPER]         = {super_,     NULL,   PREC_NONE},
+  [TOKEN_THIS]          = {this_,     NULL,   PREC_NONE},
   [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
@@ -525,6 +597,10 @@ static void addLocal(Token name){
     local->depth = -1;
     local->isCaptured = false;
 }
+
+static void statement();
+static void declaration();
+static void function(FunctionType type);
 
 static void declareVariable(){
     if(current->scopeDepth == 0) return;
@@ -605,43 +681,6 @@ static void block(){
     }
 
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
-}
-
-static void function(FunctinType type){
-    Compiler compiler;
-    initCompiler(&compiler, type);
-    beginScope();
-
-    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-    if(!check(TOKEN_RIGHT_PAREN)){
-        do{
-            current->function->arity++;
-            if(current->function->arity > 255){
-                errorAtCurrent("Can`t have more than 255 parameters.");
-            }
-            uint8_t constant = parseVariable("Expect parameter name.");
-            defineVariable(constant);
-        }while(match(TOKEN_COMMA));
-    }
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters.");
-    consume(TOKEN_LEFT_BRACE, "Expect '{' before body function.");
-    block();
-
-    ObjFunction* function = endCompiler();
-    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
-
-    for(int i = 0; i < function->upvalueCount; i++){
-        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-        emitByte(compiler.upvalues[i].index);
-    }
-}
-
-static void funDeclaration(){
-    uint8_t global = parseVariable("Expect function name.");
-
-    markInitialized();
-    function(TYPE_FUNCTION);
-    defineVariable(global);
 }
 
 static void expressionStatement(){
@@ -740,9 +779,14 @@ static void returnStatement(){
     if(current->type == TYPE_SCRIPT){
         error("Can`t return from top-level code.");
     }
+
     if(match(TOKEN_SEMICOLON)){
         emitReturn();
     }else{
+        if(current->type == TYPE_INITIALIZER){
+            error("Cannot return a value from an initializer.");
+        }
+
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         emitByte(OP_RETURN);
@@ -769,6 +813,101 @@ static void statement(){
     }
 }
 
+static void method(){
+    consume(TOKEN_IDENTIFIER, "Expect method name.");
+    uint8_t constant = identifierConstant(&parser.previous);
+
+    FunctionType type = TYPE_METHOD;
+    if(parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0 ){
+        type = TYPE_INITIALIZER;
+    }
+    function(type);
+    emitBytes(OP_METHOD, constant);
+}
+
+static void classDeclaration(){
+    consume(TOKEN_IDENTIFIER, "Expect class name.");
+    Token className = parser.previous;
+    uint8_t nameConstant = identifierConstant(&parser.previous);
+    declareVariable();
+
+    emitBytes(OP_CLASS, nameConstant);
+    defineVariable(nameConstant);
+
+    ClassCompiler classCompiler;
+    classCompiler.hasSuperClass = false;
+    classCompiler.enclosing = currentClass;
+    currentClass = &classCompiler;
+
+    if(match(TOKEN_LESS)){
+        consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+        variable(false);
+
+        if(identifiersEqual(&className, &parser.previous)){
+            error("A class can`t inherit from itself.");
+        }
+
+        beginScope();
+        addLocal(syntheticToken("super"));
+        defineVariable(0);
+
+        namedVariable(className, false);
+        emitByte(OP_INHERIT);
+        classCompiler.hasSuperClass = true;
+    }
+
+    namedVariable(className, false);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    while(!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)){
+        method();
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+    emitByte(OP_POP);
+
+    if(classCompiler.hasSuperClass){
+        endScope();
+    }
+
+    currentClass = currentClass->enclosing;
+}
+
+static void function(FunctionType type){
+    Compiler compiler;
+    initCompiler(&compiler, type);
+    beginScope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if(!check(TOKEN_RIGHT_PAREN)){
+        do{
+            current->function->arity++;
+            if(current->function->arity > 255){
+                errorAtCurrent("Can`t have more than 255 parameters.");
+            }
+            uint8_t constant = parseVariable("Expect parameter name.");
+            defineVariable(constant);
+        }while(match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before body function.");
+    block();
+
+    ObjFunction* function = endCompiler();
+    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+    for(int i = 0; i < function->upvalueCount; i++){
+        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+        emitByte(compiler.upvalues[i].index);
+    }
+}
+
+static void funDeclaration(){
+    uint8_t global = parseVariable("Expect function name.");
+
+    markInitialized();
+    function(TYPE_FUNCTION);
+    defineVariable(global);
+}
+
 static void varDeclaration(){
     uint8_t global = parseVariable("Expect variable name.");
 
@@ -784,7 +923,9 @@ static void varDeclaration(){
 }
 
 static void declaration(){
-    if(match(TOKEN_FUN)){
+    if(match(TOKEN_CLASS)){
+        classDeclaration();
+    }else if(match(TOKEN_FUN)){
         funDeclaration();
     }else if(match(TOKEN_VAR)){
         varDeclaration();

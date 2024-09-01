@@ -38,6 +38,16 @@ static void freeObject(Obj* object){
     printf("%p free type %d\n", (void *)object, object->type);
 #endif
     switch(object->type){
+        case OBJ_BOUND_METHOD:{
+            FREE(ObjBoundMethod, object);
+            break;
+        }
+        case OBJ_CLASS:{
+            ObjClass* klass = (ObjClass*) object;
+            freeTable(&klass->methods);
+            FREE(ObjClass, object);
+            break;
+        }
         case OBJ_UPVALUE:{
             FREE(ObjUpvalue, object);
             break;
@@ -52,6 +62,12 @@ static void freeObject(Obj* object){
             ObjFunction* function = (ObjFunction*) object;
             freeChunk(&function->chunk);
             FREE(ObjFunction, function);
+            break;
+        }
+        case OBJ_INSTANCE:{
+            ObjInstance* instance = (ObjInstance*) object;
+            freeTable(&instance->fields);
+            FREE(ObjInstance, instance);
             break;
         }
         case OBJ_STRING:{
@@ -108,6 +124,7 @@ static void markRoots(){
     }
 
     markCompilerRoots();
+    markObject((Obj*)vm.initString);
 }
 
 static void markArray(ValueArray* array){
@@ -124,6 +141,18 @@ static void blackenObject(Obj* object){
     printf("\n");
 #endif
     switch(object->type){
+        case OBJ_BOUND_METHOD:{
+            ObjBoundMethod* boundMethod = (ObjBoundMethod*) object;
+            markValue(boundMethod->reciever);
+            markObject((Obj*)boundMethod->method);
+            break;
+        }
+        case OBJ_CLASS:{
+            ObjClass* klass = (ObjClass*)object;
+            markObject((Obj*)klass->name);
+            markTable(&klass->methods);
+            break;
+        }
         case OBJ_CLOSURE:{
             ObjClosure* closure = (ObjClosure*)object;
             markObject((Obj*)closure->function);
@@ -136,6 +165,12 @@ static void blackenObject(Obj* object){
             ObjFunction* function = (ObjFunction*) object;
             markObject((Obj*)function->name);
             markArray(&function->chunk.constants);
+            break;
+        }
+        case OBJ_INSTANCE:{
+            ObjInstance* instance = (ObjInstance*) object;
+            markObject((Obj*)instance->klass);
+            markTable(&instance->fields);
             break;
         }
         case OBJ_UPVALUE:
